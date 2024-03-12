@@ -1,5 +1,5 @@
 // -*-c++-*--------------------------------------------------------------------
-// Copyright 2023 Bernd Pfrommer <bernd.pfrommer@gmail.com>
+// Copyright 2024 Bernd Pfrommer <bernd.pfrommer@gmail.com>
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -13,23 +13,23 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef GENICAM_UTILS_HPP_
-#define GENICAM_UTILS_HPP_
+#ifndef SPINNAKER_CAMERA_DRIVER__EXPOSURE_CONTROLLER_HPP_
+#define SPINNAKER_CAMERA_DRIVER__EXPOSURE_CONTROLLER_HPP_
 
-#include <SpinGenApi/SpinnakerGenApi.h>
-#include <Spinnaker.h>
-
-#include <sstream>
-#include <string>
+#include <memory>
 
 namespace spinnaker_camera_driver
 {
-namespace genicam_utils
-{
-void get_nodemap_as_string(std::stringstream & ss, Spinnaker::CameraPtr cam);
-Spinnaker::GenApi::CNodePtr find_node(
-  const std::string & path, Spinnaker::CameraPtr cam, bool debug);
-}  // namespace genicam_utils
-}  // namespace spinnaker_camera_driver
+class Image;
+class Camera;
 
-#endif  // GENICAM_UTILS_HPP_
+class ExposureController
+{
+public:
+  ExposureController() = default;
+  virtual ~ExposureController() {}
+  virtual void update(Camera * cam, const std::shared_ptr<const Image> & img) = 0;
+  virtual void addCamera(const std::shared_ptr<Camera> & cam) = 0;
+};
+}  // namespace spinnaker_camera_driver
+#endif  // SPINNAKER_CAMERA_DRIVER__EXPOSURE_CONTROLLER_HPP_

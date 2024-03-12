@@ -1,12 +1,18 @@
 <?xml version="1.0"?>
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
-  <name>vortex-blackfly-driver</name>
-  <version>1.0.0</version>
-  <description>ROS2 driver for flir spinnaker sdk blackfly s gige</description>
-  <maintainer email="sondreselberg@gmail.com">Sondre Selberg</maintainer>
+  <name>spinnaker_camera_driver</name>
+  <version>2.0.8</version>
+  <description>ROS2 driver for flir spinnaker sdk</description>
+  <maintainer email="bernd.pfrommer@gmail.com">Bernd Pfrommer</maintainer>
   <license>Apache-2</license>
+  <!-- all files are licensed under Apache-2 except for these two
+       files, which are licensed under the BSD 2-Clause Simplified License
+     cmake/download_spinnaker
+     cmake/TargetArch.cmake
+  -->
   <license>BSD</license>
+
 
   <buildtool_depend>ament_cmake</buildtool_depend>
 

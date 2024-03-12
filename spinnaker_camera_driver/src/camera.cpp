@@ -25,6 +25,7 @@
 #include <sensor_msgs/fill_image.hpp>
 #include <sensor_msgs/image_encodings.hpp>
 #include <spinnaker_camera_driver/camera_driver.hpp>
+#include <spinnaker_camera_driver/exposure_controller.hpp>
 #include <spinnaker_camera_driver/logging.hpp>
 #include <type_traits>
 
@@ -175,13 +176,33 @@ void Camera::printStatus()
   }
 }
 
+void Camera::checkSubscriptions()
+{
+  if (connectWhileSubscribed_) {
+    if (pub_.getNumSubscribers() > 0 || metaPub_->get_subscription_count() != 0) {
+      if (!cameraRunning_) {
+        startCamera();
+      }
+    } else {
+      if (cameraRunning_) {
+        stopCamera();
+      }
+    }
+  }
+}
+
 void Camera::readParameters()
 {
+  quiet_ = safe_declare<bool>(prefix_ + "quiet", false);
   serial_ = safe_declare<std::string>(prefix_ + "serial_number", "missing_serial_number");
-  LOG_INFO("reading ros parameters for camera with serial: " << serial_);
+  if (!quiet_) {
+    LOG_INFO("reading ros parameters for camera with serial: " << serial_);
+  }
   debug_ = safe_declare<bool>(prefix_ + "debug", false);
   adjustTimeStamp_ = safe_declare<bool>(prefix_ + "adjust_timestamp", false);
-  LOG_INFO((adjustTimeStamp_ ? "" : "not ") << "adjusting time stamps!");
+  if (!quiet_) {
+    LOG_INFO((adjustTimeStamp_ ? "" : "not ") << "adjusting time stamps!");
+  }
 
   cameraInfoURL_ = safe_declare<std::string>(prefix_ + "camerainfo_url", "");
   frameId_ = safe_declare<std::string>(prefix_ + "frame_id", node_->get_name());
@@ -191,6 +212,7 @@ void Camera::readParameters()
   computeBrightness_ = safe_declare<bool>(prefix_ + "compute_brightness", false);
   acquisitionTimeout_ = safe_declare<double>(prefix_ + "acquisition_timeout", 3.0);
   parameterFile_ = safe_declare<std::string>(prefix_ + "parameter_file", "parameters.yaml");
+  connectWhileSubscribed_ = safe_declare<bool>(prefix_ + "connect_while_subscribed", false);
   callbackHandle_ = node_->add_on_set_parameters_callback(
     std::bind(&Camera::parameterChanged, this, std::placeholders::_1));
 }
@@ -242,7 +264,9 @@ void Camera::createCameraParameters()
 
 bool Camera::setEnum(const std::string & nodeName, const std::string & v)
 {
-  LOG_INFO("setting " << nodeName << " to: " << v);
+  if (!quiet_) {
+    LOG_INFO("setting " << nodeName << " to: " << v);
+  }
   std::string retV;  // what actually was set
   std::string msg = wrapper_->setEnum(nodeName, v, &retV);
   bool status(true);
@@ -259,7 +283,9 @@ bool Camera::setEnum(const std::string & nodeName, const std::string & v)
 
 bool Camera::setDouble(const std::string & nodeName, double v)
 {
-  LOG_INFO("setting " << nodeName << " to: " << v);
+  if (!quiet_) {
+    LOG_INFO("setting " << nodeName << " to: " << v);
+  }
   double retV;  // what actually was set
   std::string msg = wrapper_->setDouble(nodeName, v, &retV);
   bool status(true);
@@ -276,7 +302,9 @@ bool Camera::setDouble(const std::string & nodeName, double v)
 
 bool Camera::setInt(const std::string & nodeName, int v)
 {
-  LOG_INFO("setting " << nodeName << " to: " << v);
+  if (!quiet_) {
+    LOG_INFO("setting " << nodeName << " to: " << v);
+  }
   int retV;  // what actually was set
   std::string msg = wrapper_->setInt(nodeName, v, &retV);
   bool status(true);
@@ -293,7 +321,9 @@ bool Camera::setInt(const std::string & nodeName, int v)
 
 bool Camera::setBool(const std::string & nodeName, bool v)
 {
-  LOG_INFO("setting " << nodeName << " to: " << v);
+  if (!quiet_) {
+    LOG_INFO("setting " << nodeName << " to: " << v);
+  }
   bool retV;  // what actually was set
   std::string msg = wrapper_->setBool(nodeName, v, &retV);
   bool status(true);
@@ -419,7 +449,7 @@ void Camera::controlCallback(const flir_camera_msgs::msg::CameraControl::UniqueP
   }
 }
 
-void Camera::publishImage(const ImageConstPtr & im)
+void Camera::processImage(const ImageConstPtr & im)
 {
   {
     std::unique_lock<std::mutex> lock(mutex_);
@@ -452,6 +482,9 @@ void Camera::run()
       }  // -------- end of locked section
       if (img && keepRunning_ && rclcpp::ok()) {
         doPublish(img);
+        if (exposureController_) {
+          exposureController_->update(this, img);
+        }
       }
     }
   }
@@ -524,7 +557,8 @@ void Camera::doPublish(const ImageConstPtr & im)
   rclcpp::Time t;
   if (synchronizer_) {
     uint64_t t_64;
-    bool haveTime = synchronizer_->getTimeStamp(im->time_, im->imageTime_, im->frameId_, &t_64);
+    bool haveTime = synchronizer_->getTimeStamp(
+      im->time_, im->imageTime_, im->frameId_, im->numIncomplete_, &t_64);
     t = rclcpp::Time(t_64, RCL_SYSTEM_TIME);
     if (!haveTime) {
       if (firstSynchronizedFrame_) {
@@ -588,7 +622,7 @@ void Camera::startCamera()
 {
   if (!cameraRunning_) {
     spinnaker_camera_driver::SpinnakerWrapper::Callback cb =
-      std::bind(&Camera::publishImage, this, std::placeholders::_1);
+      std::bind(&Camera::processImage, this, std::placeholders::_1);
     cameraRunning_ = wrapper_->startCamera(cb);
     if (!cameraRunning_) {
       LOG_ERROR("failed to start camera!");
@@ -664,7 +698,13 @@ bool Camera::start()
     // Some parameters (like blackfly s chunk control) cannot be set once
     // the camera is running.
     createCameraParameters();
-    startCamera();
+    if (!connectWhileSubscribed_) {
+      startCamera();
+    } else {
+      checkSubscriptionsTimer_ = rclcpp::create_timer(
+        node_, node_->get_clock(), rclcpp::Duration(1, 0),
+        std::bind(&Camera::checkSubscriptions, this));
+    }
   } else {
     LOG_ERROR("init camera failed for cam: " << serial_);
   }

@@ -15,6 +15,7 @@
 #
 #
 
+
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument as LaunchArg
 from launch.actions import OpaqueFunction
@@ -25,11 +26,8 @@ from launch_ros.actions import Node
 from launch_ros.substitutions import FindPackageShare
 
 
-
-
-example_parameters = {
-    'blackfly_s': {
-        'debug': False,
+blackfly_s_parameters = {
+    'debug': False,
         'compute_brightness': False,
         'adjust_timestamp': True,
         'dump_node_map': False,
@@ -60,69 +58,21 @@ example_parameters = {
         'chunk_selector_gain': 'Gain',
         'chunk_enable_gain': True,
         'chunk_selector_timestamp': 'Timestamp',
-        'chunk_enable_timestamp': True},
-    'chameleon': {
-        'debug': False,
-        'compute_brightness': False,
-        'dump_node_map': False,
-        # set parameters defined in chameleon.yaml
-        'gain_auto': 'Continuous',
-        'exposure_auto': 'Continuous',
-        'offset_x': 0,
-        'offset_y': 0,
-        'image_width': 2048,
-        'image_height': 1536,
-        'pixel_format': 'RGB8',  # 'BayerRG8, 'RGB8' or 'Mono8'
-        'frame_rate_continous': True,
-        'frame_rate': 100.0,
-        'trigger_mode': 'Off',
-        'chunk_mode_active': True,
-        'chunk_selector_frame_id': 'FrameID',
-        'chunk_enable_frame_id': True,
-        'chunk_selector_exposure_time': 'ExposureTime',
-        'chunk_enable_exposure_time': True,
-        'chunk_selector_gain': 'Gain',
-        'chunk_enable_gain': True,
-        'chunk_selector_timestamp': 'Timestamp',
-        'chunk_enable_timestamp': True},
-    'grasshopper': {
-        'debug': False,
-        'compute_brightness': False,
-        'dump_node_map': False,
-        # set parameters defined in grasshopper.yaml
-        'gain_auto': 'Continuous',
-        'exposure_auto': 'Continuous',
-        'frame_rate_auto': 'Off',
-        'frame_rate': 100.0,
-        'trigger_mode': 'Off',
-        'chunk_mode_active': True,
-        'chunk_selector_frame_id': 'FrameID',
-        'chunk_enable_frame_id': True,
-        'chunk_selector_exposure_time': 'ExposureTime',
-        'chunk_enable_exposure_time': True,
-        'chunk_selector_gain': 'Gain',
-        'chunk_enable_gain': True,
-        'chunk_selector_timestamp': 'Timestamp',
-        'chunk_enable_timestamp': True}
-    }
-
+        'chunk_enable_timestamp': True
+}
 
 def launch_setup(context, *args, **kwargs):
     """Launch camera driver node."""
     parameter_file = LaunchConfig('parameter_file').perform(context)
-    camera_type = LaunchConfig('camera_type').perform(context)
     if not parameter_file:
         parameter_file = PathJoinSubstitution(
             [FindPackageShare('spinnaker_camera_driver'), 'config',
-             camera_type + '.yaml'])
-    if camera_type not in example_parameters:
-        raise Exception('no example parameters available for type ' + camera_type)
-
+             'blackfly_s' + '.yaml'])
     node = Node(package='spinnaker_camera_driver',
                 executable='camera_driver_node',
                 output='screen',
                 name=[LaunchConfig('camera_name')],
-                parameters=[example_parameters[camera_type],
+                parameters=[blackfly_s_parameters,
                             {'parameter_file': parameter_file,
                              'serial_number': [LaunchConfig('serial')]}],
                 remappings=[('~/control', '/exposure_control/control'), ])
@@ -135,9 +85,7 @@ def generate_launch_description():
     return LaunchDescription([
         LaunchArg('camera_name', default_value=['flir_camera'],
                   description='camera name (ros node name)'),
-        LaunchArg('camera_type', default_value='blackfly_s',
-                  description='type of camera (blackfly_s, chameleon...)'),
-        LaunchArg('serial', default_value="'20435008'",
+        LaunchArg('serial', default_value="'23494258'",
                   description='FLIR serial number of camera (in quotes!!)'),
         LaunchArg('parameter_file', default_value='',
                   description='path to ros parameter definition file (override camera type)'),

@@ -15,7 +15,7 @@
 # limitations under the License.
 
 cmake_minimum_required(VERSION 3.5)
-project(vortex-blackfly-driver)
+project(spinnaker_camera_driver VERSION 2.0.0)
 
 include(CMakePackageConfigHelpers)
 include(GNUInstallDirs)
@@ -125,12 +125,12 @@ rclcpp_components_register_nodes(camera_driver "spinnaker_camera_driver::CameraD
 #
 # the driver node uses the shared library
 #
-add_executable(vortex-blackfly-driver
+add_executable(camera_driver_node
   src/camera_driver_node.cpp)
 
-target_link_libraries(vortex-blackfly-driver camera_driver)
+target_link_libraries(camera_driver_node camera_driver)
 
-target_include_directories(vortex-blackfly-driver
+target_include_directories(camera_driver_node
   PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>
 )
@@ -148,7 +148,7 @@ endif()
 # the launch file will not find it
 
 install(TARGETS
-vortex-blackfly-driver
+  camera_driver_node
   DESTINATION lib/${PROJECT_NAME}/)
 
 # the shared library goes into the global lib dir so it can
@@ -164,7 +164,7 @@ install(TARGETS
 # generate the ConfigVersion.cmake file that will be included by Config.cmake
 write_basic_package_version_file(
   ${PROJECT_NAME}ConfigVersion.cmake
-  VERSION ${PACKAGE_VERSION}
+  VERSION ${CMAKE_PROJECT_VERSION}
   COMPATIBILITY AnyNewerVersion)
 
 # generate the *Config.cmake file
