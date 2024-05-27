@@ -37,10 +37,10 @@ example_parameters = {
         'exposure_auto': 'Continuous',
         # These are useful for GigE cameras
         # 'device_link_throughput_limit': 380000000,
-        # 'gev_scps_packet_size': 9000,
+        'gev_scps_packet_size': 9000,
         # ---- to reduce the sensor width and shift the crop
-        # 'image_width': 1408,
-        # 'image_height': 1080,
+        'image_width': 704,
+        'image_height': 540,
         # 'offset_x': 16,
         # 'offset_y': 0,
         # 'binning_x': 1,
