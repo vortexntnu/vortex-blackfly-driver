@@ -13,7 +13,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <image_transport/image_transport.hpp>
 #include <rclcpp/node_options.hpp>
 #include <rclcpp_components/register_node_macro.hpp>
 #include <spinnaker_camera_driver/camera_driver.hpp>
@@ -23,9 +22,7 @@ namespace spinnaker_camera_driver
 {
 CameraDriver::CameraDriver(const rclcpp::NodeOptions & options) : Node("camera_driver", options)
 {
-  imageTransport_ = std::make_shared<image_transport::ImageTransport>(
-    std::shared_ptr<CameraDriver>(this, [](auto *) {}));
-  camera_ = std::make_shared<Camera>(this, imageTransport_.get(), "");
+  camera_ = std::make_shared<Camera>(this, "");
   if (!camera_->start()) {
     LOG_ERROR("startup failed!");
   }

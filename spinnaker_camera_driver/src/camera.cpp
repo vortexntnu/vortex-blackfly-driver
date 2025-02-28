@@ -19,7 +19,6 @@
 #include <cmath>
 #include <fstream>
 #include <functional>
-#include <image_transport/image_transport.hpp>
 #include <iomanip>
 #include <iostream>
 #include <sensor_msgs/fill_image.hpp>
@@ -106,15 +105,20 @@ Camera::NodeInfo::NodeInfo(const std::string & n, const std::string & nodeType) 
     descriptor = make_desc(n, rclcpp::ParameterType::PARAMETER_STRING);
   }
 }
-Camera::Camera(
-  rclcpp::Node * node, image_transport::ImageTransport * it, const std::string & prefix,
+Camera::Camera(rclcpp::Node * node, const std::string & prefix,
   bool useStatus)
 {
+  rclcpp::QoS qos = rclcpp::QoS(rclcpp::KeepLast(1))
+                          .reliability(RMW_QOS_POLICY_RELIABILITY_BEST_EFFORT);
+
   node_ = node;
   name_ = prefix;
-  imageTransport_ = it;
+  
   prefix_ = prefix.empty() ? std::string("") : (prefix + ".");
   topicPrefix_ = prefix.empty() ? std::string("") : (prefix + "/");
+  imagePub_ = node_->create_publisher<sensor_msgs::msg::Image>("~/" + topicPrefix_ + "image_raw", qos);
+  cameraInfoPub_ = node_->create_publisher<sensor_msgs::msg::CameraInfo>(
+    "~/" + topicPrefix_ + "camera_info", qos);
   lastStatusTime_ = node_->now();
   if (useStatus) {
     statusTimer_ = rclcpp::create_timer(
@@ -179,7 +183,7 @@ void Camera::printStatus()
 void Camera::checkSubscriptions()
 {
   if (connectWhileSubscribed_) {
-    if (pub_.getNumSubscribers() > 0 || metaPub_->get_subscription_count() != 0) {
+    if (imagePub_->get_subscription_count() > 0 || metaPub_->get_subscription_count() > 0) {
       if (!cameraRunning_) {
         startCamera();
       }
@@ -190,7 +194,6 @@ void Camera::checkSubscriptions()
     }
   }
 }
-
 void Camera::readParameters()
 {
   quiet_ = safe_declare<bool>(prefix_ + "quiet", false);
@@ -570,12 +573,12 @@ void Camera::doPublish(const ImageConstPtr & im)
     }
   } else {
     t =
-      adjustTimeStamp_ ? getAdjustedTimeStamp(im->time_, im->imageTime_) : rclcpp::Time(im->time_);
+    adjustTimeStamp_ ? getAdjustedTimeStamp(im->time_, im->imageTime_) : rclcpp::Time(im->time_);
   }
   imageMsg_.header.stamp = t;
   cameraInfoMsg_.header.stamp = t;
 
-  if (pub_.getNumSubscribers() > 0) {
+  if (imagePub_->get_subscription_count() > 0) {
     bool canEncode{false};
     const std::string encoding = flir_to_ros_encoding(im->pixelFormat_, &canEncode);
     if (!canEncode) {
@@ -586,21 +589,17 @@ void Camera::doPublish(const ImageConstPtr & im)
     }
 
     sensor_msgs::msg::CameraInfo::UniquePtr cinfo(new sensor_msgs::msg::CameraInfo(cameraInfoMsg_));
-    // will make deep copy. Do we need to? Probably...
     sensor_msgs::msg::Image::UniquePtr img(new sensor_msgs::msg::Image(imageMsg_));
-    bool ret =
-      sensor_msgs::fillImage(*img, encoding, im->height_, im->width_, im->stride_, im->data_);
+    bool ret = sensor_msgs::fillImage(*img, encoding, im->height_, im->width_, im->stride_, im->data_);
     if (!ret) {
       LOG_ERROR("fill image failed!");
     } else {
-      // const auto t0 = node_->now();
-      pub_.publish(std::move(img), std::move(cinfo));
-      // const auto t1 = node_->now();
-      // std::cout << "dt: " << (t1 - t0).nanoseconds() * 1e-9 << std::endl;
+      imagePub_->publish(std::move(img));         // Publish image
+      cameraInfoPub_->publish(std::move(cinfo));  // Publish camera info separately
       publishedCount_++;
     }
   }
-  if (metaPub_->get_subscription_count() != 0) {
+  if (metaPub_->get_subscription_count() > 0) {
     metaMsg_.header.stamp = t;
     metaMsg_.brightness = im->brightness_;
     metaMsg_.exposure_time = im->exposureTime_;
@@ -656,8 +655,6 @@ bool Camera::start()
   imageMsg_.header.frame_id = frameId_;
   cameraInfoMsg_.header.frame_id = frameId_;
   metaMsg_.header.frame_id = frameId_;
-
-  pub_ = imageTransport_->advertiseCamera("~/" + topicPrefix_ + "image_raw", qosDepth_);
 
   wrapper_ = std::make_shared<spinnaker_camera_driver::SpinnakerWrapper>();
   wrapper_->setDebug(debug_);

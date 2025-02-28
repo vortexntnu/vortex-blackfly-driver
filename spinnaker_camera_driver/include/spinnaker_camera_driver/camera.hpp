@@ -20,7 +20,6 @@
 #include <deque>
 #include <flir_camera_msgs/msg/camera_control.hpp>
 #include <flir_camera_msgs/msg/image_meta_data.hpp>
-#include <image_transport/image_transport.hpp>
 #include <limits>
 #include <map>
 #include <memory>
@@ -40,8 +39,8 @@ class Camera
 {
 public:
   using ImageConstPtr = spinnaker_camera_driver::ImageConstPtr;
-  explicit Camera(
-    rclcpp::Node * node, image_transport::ImageTransport * it, const std::string & prefix,
+  explicit Camera(rclcpp::Node * node,
+  const std::string & prefix,
     bool useStatus = true);
   ~Camera();
 
@@ -121,8 +120,8 @@ private:
   std::string prefix_;
   std::string topicPrefix_;
   rclcpp::Node * node_;
-  image_transport::ImageTransport * imageTransport_;
-  image_transport::CameraPublisher pub_;
+  rclcpp::Publisher<sensor_msgs::msg::Image>::SharedPtr imagePub_;
+  rclcpp::Publisher<sensor_msgs::msg::CameraInfo>::SharedPtr cameraInfoPub_;
   rclcpp::Publisher<flir_camera_msgs::msg::ImageMetaData>::SharedPtr metaPub_;
   std::string serial_;
   std::string name_;
